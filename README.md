@@ -10,6 +10,7 @@ Download the `code` executable script directly from GitHub into some folder in y
 
 ```sh
 $ curl https://raw.githubusercontent.com/abrahammurciano/vscode-user-installer/refs/heads/main/code > ~/.local/bin/code
+$ chmod +x ~/.local/bin/code
 ```
 
 ### Method 2 - `git`
