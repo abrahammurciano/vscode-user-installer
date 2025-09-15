@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+
+URL="https://code.visualstudio.com/sha/download?build=stable&os=linux-x64"
+ICON_URL="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/visual-studio-code-icon.png"
+INSTALL_PATH="$HOME/.local/share/vscode-user-installer"
+CODE_BINARY="$INSTALL_PATH/VSCode-linux-x64/bin/code"
+VERSION_FILE="$INSTALL_PATH/version_id"
+ICON="$INSTALL_PATH/icon.png"
+THIS_SCRIPT="$(realpath "$0")"
+DESKTOP_FILE="$HOME/.local/share/applications/code.desktop"
+DESKTOP_FILE_CONTENT="#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=VS Code (user)
+Comment=Code Editing. Redefined.
+GenericName=Text Editor
+Exec=$THIS_SCRIPT %F
+Icon=$ICON
+Type=Application
+StartupNotify=false
+StartupWMClass=Code
+Categories=TextEditor;Development;IDE;
+MimeType=text/plain;inode/directory;application/x-code-workspace;
+Actions=new-empty-window;no-update;reinstall;
+Keywords=vscode;
+
+[Desktop Action new-empty-window]
+Name=New Empty Window
+Exec=$THIS_SCRIPT --new-window %F
+Icon=$ICON
+
+[Desktop Action no-update]
+Name=Launch without updating
+Exec=$CODE_BINARY %F
+Icon=$ICON
+
+[Desktop Action reinstall]
+Name=Reinstall
+Exec=/bin/bash -c 'rm -rf $INSTALL_PATH && $THIS_SCRIPT %F'
+Icon=$ICON
+"
+
+
+function log {
+	echo "$@" > /dev/stderr
+}
+
+function latest-version {
+	curl -s $URL | sed -e 's/^.*-//' -e 's/\.tar\.gz//'
+}
+
+function current-version {
+	cat $VERSION_FILE 2>/dev/null
+}
+
+function update-available {
+	local latest=$(latest-version)
+	if test "$(current-version)" != "$latest" ; then
+		echo $latest
+	fi
+}
+
+function create-temp-dir {
+    local tmp=$(mktemp -d)
+    function cleanup {
+        rm -rf "$tmp"
+    }
+    trap cleanup EXIT
+    echo "$tmp"
+}
+
+function download {
+	local url="$1"
+	local dest_file="$2"
+	curl -L --output "$dest_file" "$url"
+}
+
+function extract {
+	local tar_file="$1"
+	local dest_dir="$2"
+	mkdir -p "$INSTALL_PATH"
+	tar -xf "$tar_file" -C "$dest_dir"
+}
+
+function create-code-desktop {
+	local desktop_file="$1"
+	local content="$2"
+	echo "$content" > "$desktop_file"
+	chmod +x "$desktop_file"
+	gio set "$desktop_file" "metadata::trusted" yes
+	log "To launch your user install via the GUI, you must recreate any GUI shortcuts you currently have."
+}
+
+function update-vs-code {
+	local next="$1"
+	local tmp=$(create-temp-dir)
+	local tar_file="$tmp/code.tar.gz"
+	log "Downloading..."
+	download "$URL" "$tar_file"
+	log "Extracting..."
+	extract "$tar_file" "$INSTALL_PATH"
+	download "$ICON_URL" "$ICON"
+	log "Creating code.desktop file..."
+	create-code-desktop "$DESKTOP_FILE" "$DESKTOP_FILE_CONTENT"
+	echo "$next" > "$VERSION_FILE"
+}
+
+function launch-vs-code {
+	exec "$CODE_BINARY" "$@"
+}
+
+function main {
+	local next=$(update-available)
+	if test -n "$next" ; then
+		log "VS Code version $next is available. Updating..."
+		update-vs-code "$next"
+		log "Updated code to version: $($CODE_BINARY --version)"
+		log "To uninstall, run:"
+		log "$ rm -rf "'"'"$INSTALL_PATH"'"'" "'"'"$DESKTOP_FILE"'"'" "'"'"$THIS_SCRIPT"'"'
+	fi
+	launch-vs-code "$@"
+}
+
+main "$@"
