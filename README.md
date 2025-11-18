@@ -45,3 +45,7 @@ And delete the `.desktop` file to revert the GUI launchers to the system version
 ```sh
 $ rm ~/.local/share/applications/code.desktop
 ```
+To uninstall the user installation of VS Code itself, delete the installation folder.
+```sh
+$ rm -rf ~/.local/share/vscode-user-installer
+```
